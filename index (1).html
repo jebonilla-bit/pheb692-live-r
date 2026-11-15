@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Live R · Recode</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one narrow reading column of numbered code cells, like a script read top to bottom */
+:root {
+  --bg: #f7f5f3;
+  --surface: #fffefc;
+  --fg: #22191b;
+  --muted: #5d5356;
+  --line: #e2dcd8;
+  --accent: #500000;
+  --accent-fg: #fffefc;
+  --code-bg: #1f1b1c;
+  --code-fg: #f1ebe8;
+  --code-muted: #a99da0;
+  --ok: #1d6b45;
+  --warn: #8a5a00;
+  --err: #b42318;
+  --out-err: #ff9c8f;
+  --stripe: #f3eeeb;
+  --font-body: "IBM Plex Sans", "Segoe UI", Arial, sans-serif;
+  --font-code: "JetBrains Mono", Consolas, "Courier New", monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #171314; --surface: #221d1e; --fg: #f2ecea; --muted: #b8acaf; --line: #3a3233;
+    --accent: #e8a3a3; --accent-fg: #2a0d0d; --code-bg: #0f0c0d; --code-fg: #f1ebe8; --code-muted: #a99da0;
+    --ok: #7fd1a6; --warn: #f0c36a; --err: #ff9c8f; --stripe: #2a2425; color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg); color: var(--fg); font: 16px/1.55 var(--font-body);
+  padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(32px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+}
+main { max-width: 860px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+header { display: flex; flex-direction: column; gap: 8px; padding-block: 8px 4px; }
+.eyebrow { font-size: 13px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); margin: 0; }
+h1 { font-size: clamp(28px, 6vw, 40px); line-height: 1.1; margin: 0; text-wrap: balance; }
+.lede { margin: 0; color: var(--muted); max-width: 62ch; }
+.status { display: inline-flex; align-items: center; gap: 8px; align-self: flex-start; font-size: 14px; font-weight: 600;
+  padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); }
+.status .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--warn); }
+.status[data-state="ready"] .dot { background: var(--ok); }
+.status[data-state="error"] .dot { background: var(--err); }
+.status[data-state="loading"] .dot { animation: pulse 1.2s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: .3; } }
+@media (prefers-reduced-motion: reduce) { .status .dot { animation: none !important; } }
+.cell { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.cell h2 { font-size: 20px; margin: 0; line-height: 1.25; }
+.cell h2 span { color: var(--accent); margin-right: 6px; }
+.cell p { margin: 0; color: var(--muted); }
+.cell p code, .lede code { font-family: var(--font-code); font-size: .9em; color: var(--fg); }
+textarea {
+  width: 100%; min-width: 0; resize: vertical; border: 0; border-radius: 8px; padding: 14px;
+  background: var(--code-bg); color: var(--code-fg); font: 15px/1.55 var(--font-code); tab-size: 2; white-space: pre; overflow-x: auto;
+}
+textarea:focus-visible, button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+button { font: 600 15px var(--font-body); border-radius: 8px; padding: 9px 16px; cursor: pointer; border: 1px solid var(--line); background: var(--surface); color: var(--fg); }
+button.run { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+button:disabled { opacity: .5; cursor: not-allowed; }
+.hint { font-size: 13px; color: var(--muted); }
+pre.out { margin: 0; background: var(--code-bg); color: var(--code-fg); border-radius: 8px; padding: 14px; font: 14px/1.5 var(--font-code); overflow-x: auto; min-height: 3em; white-space: pre; }
+pre.out:empty::before { content: "Output appears here after you press Run."; color: var(--code-muted); }
+pre.out .err { color: var(--out-err); }
+pre.out .msg { color: var(--code-muted); }
+details.viewer { display: flex; flex-direction: column; gap: 8px; }
+details.viewer summary { cursor: pointer; font-weight: 600; color: var(--fg); }
+.table-wrap { max-height: 420px; overflow: auto; border: 1px solid var(--line); border-radius: 8px; margin-top: 8px; }
+table.data { border-collapse: collapse; font: 13px/1.4 var(--font-code); width: max-content; min-width: 100%; font-variant-numeric: tabular-nums; }
+table.data th { position: sticky; top: 0; background: var(--surface); border-bottom: 1px solid var(--line); padding: 0; text-align: left; }
+table.data th button { all: unset; display: block; padding: 8px 10px; cursor: pointer; font-weight: 600; white-space: nowrap; }
+table.data th button:focus-visible { outline: 3px solid var(--accent); outline-offset: -3px; }
+table.data td { padding: 6px 10px; white-space: nowrap; border-bottom: 1px solid var(--line); }
+table.data tbody tr:nth-child(even) { background: var(--stripe); }
+table.data td.na { color: var(--muted); font-style: italic; }
+footer { font-size: 13px; color: var(--muted); display: flex; flex-direction: column; gap: 4px; }
+footer a { color: var(--accent); }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <p class="eyebrow">PHEB 692 · Week 6 · Data Cleaning II</p>
+    <h1>Run R in your browser</h1>
+    <p class="lede">Real R, running on your own device with no installation. The H7N9 avian influenza dataset (China, 2013; 136 cases) is already loaded as <code>flu</code>.</p>
+    <div class="status" id="status" data-state="loading" role="status" aria-live="polite"><span class="dot" aria-hidden="true"></span><span id="status-text">Starting R…</span></div>
+  </header>
+
+  <section class="cell" data-cell="look">
+    <h2><span>1</span>Look at the raw data</h2>
+    <p>Press Run. What looks wrong with <code>gender</code>, <code>age</code> and <code>outcome</code>?</p>
+    <label class="hint" for="code-look">R code (you can edit it)</label>
+    <textarea id="code-look" spellcheck="false"></textarea>
+    <div class="actions"><button class="run" type="button" disabled>Run</button><button class="reset" type="button">Reset</button><span class="hint">Ctrl/⌘ + Enter also runs</span></div>
+    <pre class="out" aria-live="polite"></pre>
+  </section>
+
+  <section class="cell" data-cell="explore">
+    <h2><span>2</span>Explore the data</h2>
+    <p>Open the data viewer and click a column name to sort it, the same as <code>View(flu)</code> in RStudio. Try sorting by <code>age</code>: what comes first? Then run the code to count and filter.</p>
+    <details class="viewer">
+      <summary>Data viewer: 136 cases (click a column to sort)</summary>
+      <div class="table-wrap"><table class="data" id="viewer"></table></div>
+    </details>
+    <label class="hint" for="code-explore">R code (you can edit it)</label>
+    <textarea id="code-explore" spellcheck="false"></textarea>
+    <div class="actions"><button class="run" type="button" disabled>Run</button><button class="reset" type="button">Reset</button></div>
+    <pre class="out" aria-live="polite"></pre>
+  </section>
+
+  <section class="cell" data-cell="recode">
+    <h2><span>3</span>Recode gender</h2>
+    <p><code>recode()</code> swaps old values for new ones: <code>"old" = "new"</code>. Values you do not list stay as they are.</p>
+    <label class="hint" for="code-recode">R code (you can edit it)</label>
+    <textarea id="code-recode" spellcheck="false"></textarea>
+    <div class="actions"><button class="run" type="button" disabled>Run</button><button class="reset" type="button">Reset</button></div>
+    <pre class="out" aria-live="polite"></pre>
+  </section>
+
+  <section class="cell" data-cell="turn">
+    <h2><span>4</span>Your turn: fix age and outcome</h2>
+    <p>Replace each <code>___</code>: turn the <code>"?"</code> in age into a missing value, and missing outcomes into <code>"Unknown"</code>. Then press Run.</p>
+    <label class="hint" for="code-turn">R code (you can edit it)</label>
+    <textarea id="code-turn" spellcheck="false"></textarea>
+    <div class="actions"><button class="run" type="button" disabled>Run</button><button class="reset" type="button">Reset</button><button class="answer" type="button">Show answer</button></div>
+    <pre class="out" aria-live="polite"></pre>
+  </section>
+
+  <section class="cell" data-cell="free">
+    <h2><span>5</span>Free play</h2>
+    <p>Change anything and run it again: rename a province, sort by age, count by outcome.</p>
+    <label class="hint" for="code-free">R code (you can edit it)</label>
+    <textarea id="code-free" spellcheck="false"></textarea>
+    <div class="actions"><button class="run" type="button" disabled>Run</button><button class="reset" type="button">Reset</button></div>
+    <pre class="out" aria-live="polite"></pre>
+  </section>
+
+  <footer>
+    <span>Data: Kucharski et al. (2014), <i>PLOS Currents Outbreaks</i>, via the Epidemiologist R Handbook. R runs locally through <a href="https://docs.r-wasm.org/webr/latest/" target="_blank" rel="noopener">webR</a>; nothing you type is sent anywhere.</span>
+    <span>J. Esteban Bonilla, MD, MSc · School of Public Health</span>
+  </footer>
+</main>
+
+<script type="module">
+const CSV = "case_id,date_of_onset,date_of_hospitalisation,date_of_outcome,outcome,gender,age,province\n1,2/19/2013,NA,3/4/2013,Death,m,87,Shanghai\n2,2/27/2013,3/3/2013,3/10/2013,Death,m,27,Shanghai\n3,3/9/2013,3/19/2013,4/9/2013,Death,f,35,Anhui\n4,3/19/2013,3/27/2013,NA,NA,f,45,Jiangsu\n5,3/19/2013,3/30/2013,5/15/2013,Recover,f,48,Jiangsu\n6,3/21/2013,3/28/2013,4/26/2013,Death,f,32,Jiangsu\n7,3/20/2013,3/29/2013,4/9/2013,Death,m,83,Jiangsu\n8,3/7/2013,3/18/2013,3/27/2013,Death,m,38,Zhejiang\n9,3/25/2013,3/25/2013,NA,NA,m,67,Zhejiang\n10,3/28/2013,4/1/2013,4/3/2013,Death,m,48,Shanghai\n11,3/29/2013,3/31/2013,4/4/2013,Death,m,64,Zhejiang\n12,3/27/2013,NA,4/3/2013,Death,f,52,Shanghai\n13,3/22/2013,3/25/2013,4/3/2013,Death,f,67,Shanghai\n14,3/31/2013,NA,4/10/2013,Recover,m,4,Shanghai\n15,3/20/2013,NA,NA,NA,f,61,Jiangsu\n16,3/21/2013,NA,NA,NA,m,79,Jiangsu\n17,3/28/2013,4/3/2013,4/11/2013,Death,m,74,Shanghai\n18,3/29/2013,4/2/2013,4/18/2013,Recover,m,66,Shanghai\n19,3/25/2013,3/30/2013,5/31/2013,Death,m,59,Shanghai\n20,3/28/2013,4/1/2013,4/19/2013,Recover,m,55,Anhui\n21,3/29/2013,3/30/2013,4/21/2013,Recover,m,67,Shanghai\n22,3/28/2013,4/1/2013,NA,NA,m,85,Jiangsu\n23,3/30/2013,3/30/2013,5/15/2013,Recover,f,25,Jiangsu\n24,4/1/2013,NA,4/7/2013,Death,m,64,Shanghai\n25,4/1/2013,4/1/2013,5/6/2013,Recover,m,62,Shanghai\n26,4/3/2013,4/7/2013,4/14/2013,Death,m,77,Shanghai\n27,3/13/2013,4/9/2013,4/19/2013,Recover,f,51,Zhejiang\n28,3/29/2013,NA,NA,NA,m,79,Zhejiang\n29,4/1/2013,4/5/2013,5/3/2013,Recover,f,76,Shanghai\n30,4/4/2013,NA,4/27/2013,Recover,f,81,Shanghai\n31,3/29/2013,NA,NA,NA,m,70,Jiangsu\n32,4/2/2013,NA,NA,NA,m,74,Jiangsu\n33,4/3/2013,NA,4/27/2013,Recover,m,65,Zhejiang\n34,3/31/2013,4/5/2013,4/11/2013,Death,m,74,Shanghai\n35,4/2/2013,4/7/2013,5/10/2013,Death,f,83,Shanghai\n36,4/4/2013,NA,4/21/2013,Recover,m,68,Shanghai\n37,3/31/2013,NA,5/15/2013,Recover,m,31,Jiangsu\n38,4/3/2013,NA,NA,NA,m,56,Jiangsu\n39,4/8/2013,4/8/2013,NA,NA,m,66,Zhejiang\n40,4/6/2013,4/11/2013,NA,NA,m,74,Zhejiang\n41,4/6/2013,4/12/2013,NA,NA,f,54,Zhejiang\n42,4/3/2013,4/10/2013,NA,NA,m,53,Shanghai\n43,4/3/2013,4/6/2013,4/21/2013,Death,m,86,Shanghai\n44,4/11/2013,4/11/2013,4/17/2013,Recover,f,7,Beijing\n45,4/1/2013,4/4/2013,6/26/2013,Death,m,56,Shanghai\n46,4/5/2013,NA,4/14/2013,Death,f,77,Jiangsu\n47,4/1/2013,NA,NA,NA,m,72,Jiangsu\n48,4/3/2013,4/9/2013,NA,NA,m,65,Zhejiang\n49,4/6/2013,4/11/2013,5/4/2013,Recover,m,38,Zhejiang\n50,4/6/2013,4/9/2013,NA,Recover,m,34,Henan\n51,4/8/2013,4/10/2013,4/23/2013,Recover,m,65,Henan\n52,4/6/2013,NA,NA,NA,f,64,Zhejiang\n53,3/29/2013,NA,4/20/2013,Death,f,62,Zhejiang\n54,4/6/2013,NA,NA,NA,m,75,Zhejiang\n55,4/9/2013,NA,4/27/2013,Recover,m,79,Zhejiang\n56,4/5/2013,4/11/2013,NA,NA,m,73,Shanghai\n57,4/8/2013,4/12/2013,4/21/2013,Recover,m,54,Shanghai\n58,4/4/2013,4/8/2013,5/5/2013,Recover,m,78,Shanghai\n59,4/1/2013,NA,5/8/2013,Recover,m,50,Jiangsu\n60,4/8/2013,NA,4/26/2013,Recover,m,26,Jiangsu\n61,4/6/2013,NA,4/16/2013,Death,m,60,Jiangsu\n62,4/3/2013,NA,NA,NA,f,68,Zhejiang\n63,4/10/2013,NA,NA,NA,m,60,Anhui\n64,NA,NA,5/11/2013,Recover,m,56,Jiangsu\n65,NA,NA,5/16/2013,Recover,f,21,Jiangsu\n66,NA,NA,NA,NA,m,72,Jiangsu\n67,4/12/2013,NA,NA,NA,m,56,Zhejiang\n68,4/10/2013,NA,NA,NA,m,57,Zhejiang\n69,4/10/2013,NA,NA,NA,m,62,Zhejiang\n70,4/11/2013,NA,NA,NA,f,58,Zhejiang\n71,4/10/2013,NA,NA,NA,f,72,Zhejiang\n72,4/10/2013,4/15/2013,4/27/2013,Recover,m,47,Shanghai\n73,NA,NA,NA,Recover,m,69,Shanghai\n74,NA,NA,NA,Recover,NA,?,Shanghai\n75,NA,NA,NA,Death,NA,?,Shanghai\n76,NA,NA,NA,Death,m,55,Shanghai\n77,3/17/2013,NA,NA,Recover,m,2,Shanghai\n78,4/12/2013,4/16/2013,4/29/2013,Death,m,89,Shanghai\n79,4/11/2013,NA,4/27/2013,Recover,f,37,Zhejiang\n80,4/8/2013,NA,NA,NA,m,74,Zhejiang\n81,4/13/2013,NA,4/23/2013,Death,m,86,Zhejiang\n82,4/14/2013,NA,4/22/2013,Recover,m,41,Zhejiang\n83,NA,NA,NA,Recover,m,38,Henan\n84,NA,NA,NA,NA,f,26,Jiangsu\n85,4/9/2013,4/16/2013,NA,NA,f,80,Shanghai\n86,4/13/2013,NA,NA,NA,f,54,Zhejiang\n87,4/11/2013,NA,4/19/2013,Death,m,69,Zhejiang\n88,NA,NA,NA,NA,m,4,Beijing\n89,4/9/2013,4/15/2013,5/15/2013,Recover,m,54,Jiangsu\n90,4/12/2013,4/15/2013,NA,NA,m,43,Zhejiang\n91,4/11/2013,4/17/2013,4/27/2013,Recover,m,48,Zhejiang\n92,4/10/2013,4/17/2013,NA,NA,f,66,Zhejiang\n93,4/11/2013,NA,NA,NA,m,56,Zhejiang\n94,4/14/2013,NA,4/27/2013,Recover,f,35,Zhejiang\n95,3/30/2013,NA,NA,NA,m,37,Zhejiang\n96,4/7/2013,NA,NA,NA,m,43,Jiangsu\n97,4/13/2013,4/18/2013,5/5/2013,Recover,f,75,Shanghai\n98,4/8/2013,NA,4/21/2013,Death,m,76,Zhejiang\n99,4/12/2013,NA,NA,NA,f,68,Zhejiang\n100,4/16/2013,NA,NA,NA,m,58,Zhejiang\n101,4/13/2013,NA,NA,NA,f,79,Zhejiang\n102,4/12/2013,NA,NA,NA,m,81,Zhejiang\n103,4/13/2013,4/19/2013,NA,NA,m,68,Jiangsu\n104,4/16/2013,NA,NA,NA,f,54,Zhejiang\n105,4/14/2013,NA,NA,NA,m,32,Zhejiang\n106,4/16/2013,4/22/2013,5/16/2013,Recover,m,36,Shandong\n107,4/14/2013,NA,5/5/2013,Death,m,91,Anhui\n108,4/15/2013,NA,NA,NA,m,84,Zhejiang\n109,4/15/2013,NA,NA,NA,m,62,Zhejiang\n110,4/12/2013,4/16/2013,NA,NA,m,53,Taiwan\n111,4/17/2013,NA,5/9/2013,Death,m,56,Henan\n112,4/17/2013,NA,NA,NA,m,69,Jiangxi\n113,4/15/2013,NA,NA,NA,f,60,Zhejiang\n114,4/18/2013,NA,NA,NA,f,50,Zhejiang\n115,4/17/2013,NA,NA,NA,m,38,Zhejiang\n116,4/18/2013,4/23/2013,5/9/2013,Recover,m,65,Fujian\n117,4/19/2013,NA,5/17/2013,Recover,f,76,Jiangxi\n118,4/17/2013,NA,NA,NA,m,49,Jiangsu\n119,4/19/2013,NA,5/15/2013,Recover,m,36,Jiangsu\n120,3/8/2013,NA,NA,NA,m,60,Jiangsu\n121,4/14/2013,4/19/2013,5/14/2013,Death,f,64,Hunan\n122,4/18/2013,NA,NA,NA,m,38,Zhejiang\n123,4/15/2013,4/22/2013,5/1/2013,Death,m,54,Jiangxi\n124,4/21/2013,NA,5/8/2013,Recover,m,80,Jiangxi\n125,4/23/2013,NA,5/13/2013,Recover,f,31,Jiangxi\n126,4/17/2013,4/27/2013,NA,NA,m,80,Fujian\n127,4/27/2013,NA,5/6/2013,Recover,m,4,Shandong\n128,4/21/2013,4/28/2013,5/13/2013,Recover,m,58,Fujian\n129,4/23/2013,4/27/2013,5/21/2013,Recover,m,69,Hunan\n130,4/29/2013,4/30/2013,NA,NA,m,69,Fujian\n131,4/26/2013,4/27/2013,NA,Recover,m,9,Fujian\n132,5/3/2013,5/3/2013,NA,NA,f,79,Jiangxi\n133,5/21/2013,5/21/2013,5/23/2013,Recover,m,6,Beijing\n134,4/25/2013,4/26/2013,5/2/2013,Recover,m,15,Jiangsu\n135,7/10/2013,7/13/2013,8/11/2013,Death,f,61,Hebei\n136,7/27/2013,7/28/2013,NA,NA,f,51,Guangdong\n";
+
+const CODE = {
+  look: `glimpse(flu)`,
+  explore: `head(flu, 8)          # first 8 rows
+
+count(flu, gender)    # how is gender coded?
+count(flu, outcome)   # how many outcomes are missing?
+
+flu %>%               # which cases have age "?"
+  filter(age == "?")`,
+  recode: `flu_clean <- flu %>%
+  mutate(gender = recode(gender, "m" = "Male", "f" = "Female"))
+
+count(flu, gender)        # before
+count(flu_clean, gender)  # after`,
+  turn: `flu_clean <- flu %>%
+  mutate(
+    gender  = recode(gender, "m" = "Male", "f" = "Female"),
+    age     = recode(age, "?" = ___),
+    outcome = recode(outcome, .missing = ___)
+  )
+
+count(flu_clean, outcome)`,
+  free: `flu %>%
+  mutate(province = recode(province, "Shanghai" = "SH")) %>%
+  count(province, sort = TRUE)`
+};
+const ANSWER3 = CODE.turn.replace('"?" = ___', '"?" = NA_character_').replace('.missing = ___', '.missing = "Unknown"');
+
+const params = new URLSearchParams(location.search);
+const BASE = params.get("base") || "https://cdn.jsdelivr.net/npm/webr@0.6.0/dist/";
+const SKIP_PKG = params.has("nopkg"); // testing only
+const statusEl = document.getElementById("status");
+const statusText = document.getElementById("status-text");
+let webR = null;
+
+function setStatus(state, text) { statusEl.dataset.state = state; statusText.textContent = text; }
+
+function fit(ta) { ta.rows = Math.max(2, ta.value.split("\n").length + 1); }
+
+document.querySelectorAll(".cell").forEach(cell => {
+  const n = cell.dataset.cell;
+  const ta = cell.querySelector("textarea");
+  const out = cell.querySelector("pre.out");
+  const runBtn = cell.querySelector("button.run");
+  ta.value = CODE[n]; fit(ta);
+  ta.addEventListener("input", () => fit(ta));
+  ta.addEventListener("keydown", e => {
+    if (e.key === "Tab" && !e.shiftKey) {
+      e.preventDefault();
+      const s = ta.selectionStart, en = ta.selectionEnd;
+      ta.value = ta.value.slice(0, s) + "  " + ta.value.slice(en);
+      ta.selectionStart = ta.selectionEnd = s + 2;
+    }
+    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); if (!runBtn.disabled) run(ta, out, runBtn); }
+  });
+  runBtn.addEventListener("click", () => run(ta, out, runBtn));
+  cell.querySelector("button.reset").addEventListener("click", () => { ta.value = CODE[n]; fit(ta); out.textContent = ""; });
+  const ans = cell.querySelector("button.answer");
+  if (ans) ans.addEventListener("click", () => { ta.value = ANSWER3; fit(ta); });
+});
+
+function append(out, text, cls) {
+  const span = document.createElement("span");
+  if (cls) span.className = cls;
+  span.textContent = text.endsWith("\n") ? text : text + "\n";
+  out.appendChild(span);
+}
+
+async function run(ta, out, btn) {
+  if (!webR) return;
+  out.textContent = "";
+  btn.disabled = true; btn.textContent = "Running…";
+  const shelter = await new webR.Shelter();
+  try {
+    const res = await shelter.captureR(ta.value, { withAutoprint: true, captureStreams: true, captureConditions: false });
+    let inError = false;
+    for (const line of res.output) {
+      if (line.type === "stdout") { append(out, line.data); continue; }
+      if (/^Error/.test(line.data)) inError = true;
+      append(out, line.data, inError ? "err" : "msg");
+    }
+    if (inError && ta.value.includes("___")) append(out, "Tip: replace each ___ before running.", "msg");
+    if (!res.output.length) append(out, "(Done. This code printed nothing.)", "msg");
+  } catch (e) {
+    let msg = String(e && e.message ? e.message : e);
+    append(out, "Error: " + msg.trim(), "err");
+    if (ta.value.includes("___")) append(out, "Tip: replace each ___ before running.", "msg");
+  } finally {
+    shelter.purge();
+    btn.disabled = false; btn.textContent = "Run";
+  }
+}
+
+async function boot() {
+  try {
+    setStatus("loading", "Starting R… (about 10 seconds)");
+    const { WebR } = await import(BASE + "webr.js");
+    webR = new WebR({ baseUrl: BASE });
+    await webR.init();
+    if (!SKIP_PKG) {
+      setStatus("loading", "Installing dplyr… (about 20 seconds the first time)");
+      await webR.installPackages(["dplyr"], { quiet: true });
+    }
+    await webR.FS.writeFile("/home/web_user/h7n9_china_2013_raw.csv", new TextEncoder().encode(CSV));
+    await webR.evalRVoid(SKIP_PKG
+      ? `flu <- read.csv("/home/web_user/h7n9_china_2013_raw.csv", na.strings = c("", "NA"))`
+      : `suppressPackageStartupMessages(library(dplyr))
+         options(width = 100)
+         flu <- tibble::as_tibble(read.csv("/home/web_user/h7n9_china_2013_raw.csv", na.strings = c("", "NA")))`);
+    document.querySelectorAll("button.run").forEach(b => b.disabled = false);
+    setStatus("ready", "R is ready. Press Run in any cell.");
+  } catch (e) {
+    console.error(e);
+    webR = null;
+    setStatus("error", "R could not start. Check your internet connection and reload the page.");
+  }
+}
+// Data viewer: sortable table built from the embedded CSV
+(function buildViewer() {
+  const lines = CSV.trim().split(/\r?\n/);
+  const cols = lines[0].split(",");
+  const rows = lines.slice(1).map(l => l.split(","));
+  const table = document.getElementById("viewer");
+  const thead = document.createElement("thead");
+  const tbody = document.createElement("tbody");
+  const htr = document.createElement("tr");
+  let sortCol = -1, asc = true;
+  const collator = new Intl.Collator("en");
+  function render() {
+    tbody.textContent = "";
+    for (const r of rows) {
+      const tr = document.createElement("tr");
+      r.forEach(v => {
+        const td = document.createElement("td");
+        if (v === "NA" || v === "") { td.textContent = "NA"; td.className = "na"; } else td.textContent = v;
+        tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+    }
+  }
+  cols.forEach((c, i) => {
+    const th = document.createElement("th");
+    th.scope = "col";
+    const b = document.createElement("button");
+    b.type = "button"; b.textContent = c;
+    b.addEventListener("click", () => {
+      asc = sortCol === i ? !asc : true; sortCol = i;
+      const isNum = c === "case_id";
+      rows.sort((x, y) => {
+        const a = x[i], d = y[i];
+        const an = a === "NA" || a === "", dn = d === "NA" || d === "";
+        if (an || dn) return an === dn ? 0 : an ? 1 : -1;   // NA always last
+        const cmp = isNum ? Number(a) - Number(d) : collator.compare(a, d); // text sorts as text, like RStudio
+        return asc ? cmp : -cmp;
+      });
+      htr.querySelectorAll("button").forEach(x => { x.textContent = x.textContent.replace(/ [▲▼]$/, ""); x.parentElement.removeAttribute("aria-sort"); });
+      b.textContent = c + (asc ? " ▲" : " ▼");
+      th.setAttribute("aria-sort", asc ? "ascending" : "descending");
+      render();
+    });
+    th.appendChild(b); htr.appendChild(th);
+  });
+  thead.appendChild(htr); table.append(thead, tbody); render();
+})();
+
+boot();
+</script>
+</body>
+</html>
